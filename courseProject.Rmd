@@ -1,0 +1,113 @@
+---
+title: "course project"
+date: "1/14/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Background
+
+   Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+   
+
+```{r settings, include=FALSE}
+library(knitr)
+setwd("/home/eva/R/PracticalMachineLearning")
+```
+   
+
+## Goal
+
+The goal of the project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. It will use any of the other variables to predict with. 
+   
+## Loading data
+
+The training data for this project are available here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment. 
+
+```{r data, echo = FALSE}
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+library(corrplot)
+set.seed(4)
+```
+
+
+```{r load data}
+trainCsv <- read.csv("pml-training.csv", na.strings=c("#DIV/0!"))
+testCsv <- read.csv("pml-testing.csv", na.strings=c("#DIV/0!"))
+
+#cleaning and preprocessing data
+
+```
+Cleaning and preprocessing data: first we Remove columns with little or no data.The second step is to create Training and test data from traing data for cross validation checking. 
+
+```{r clean data}
+trainingData <- trainCsv[, colSums(is.na(trainCsv)) == 0] 
+testingData <- testCsv[, colSums(is.na(testCsv)) == 0] 
+classe <- trainingData$classe
+trainR <- grepl("^X|timestamp|window", names(trainingData))
+trainingData <- trainingData[, !trainR]
+trainC <- trainingData[, sapply(trainingData, is.numeric)]
+trainC$classe <- classe
+testR <- grepl("^X|timestamp|window", names(testingData))
+testingData <- testingData[, !testR]
+testC <- testingData[, sapply(testingData, is.numeric)]
+
+set.seed(1905) # For reproducibile purpose
+inTrain <- createDataPartition(trainC$classe, p=0.70, list=F)
+trainData <- trainC[inTrain, ]
+testData <- trainC[-inTrain, ]
+```
+
+
+## Training
+
+
+```{r training}
+tC <- trainControl(method="cv", 5)
+rF <- train(classe ~ ., data=trainData, method="rf", trControl=tC, ntree=250)
+rF
+```
+
+
+
+
+```{r predict}
+pF <- predict(rF, testData)
+confusionMatrix(testData$classe, pF)
+
+```
+
+## Results
+
+```{r result}
+accuracy <- postResample(pF, testData$classe)
+accuracy
+result <- predict(rF, testC[, -length(names(testC))])
+result
+```
+
+
+```{r plots}
+plot <- cor(trainData[, -length(names(trainData))])
+corrplot(plot, method="color")
+plot(plot, main = "Importance of Top 30 Variables", top = 30)
+
+treeModel <- rpart(classe ~ ., data=trainData, method="class")
+prp(treeModel) # fast plot
+
+```
+
